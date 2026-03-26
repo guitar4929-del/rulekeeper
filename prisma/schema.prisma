@@ -1,0 +1,90 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Trade {
+  id            String   @id @default(cuid())
+  sessionId     String
+  dateTime      DateTime
+  symbol        String
+  side          String   // BUY or SELL
+  lotSize       Float
+  entryPrice    Float
+  exitPrice     Float?
+  stopLoss      Float?
+  takeProfit    Float?
+  pnl           Float?
+  pnlPercent    Float?
+  duration      Int?     // minutes
+  reason        String?
+  memo          String?
+  originalSL    Float?   // original stop loss before modification
+  createdAt     DateTime @default(now())
+
+  session       UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  violations    Violation[]
+
+  @@index([sessionId])
+  @@index([dateTime])
+}
+
+model UploadSession {
+  id            String   @id @default(cuid())
+  fileName      String
+  uploadedAt    DateTime @default(now())
+  tradeCount    Int      @default(0)
+  columnMapping String?  // JSON string
+
+  trades        Trade[]
+  violations    Violation[]
+  reports       Report[]
+}
+
+model Rule {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // max_loss, max_lot, cooldown, no_averaging, sl_modification, early_tp, consecutive_entry, no_reason
+  enabled     Boolean  @default(true)
+  params      String   // JSON string for rule parameters
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  violations  Violation[]
+}
+
+model Violation {
+  id          String   @id @default(cuid())
+  tradeId     String
+  ruleId      String
+  sessionId   String
+  severity    String   // high, medium, low
+  message     String
+  detail      String?  // JSON string
+  createdAt   DateTime @default(now())
+
+  trade       Trade         @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  rule        Rule          @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  session     UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([tradeId])
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  sessionId   String
+  type        String   // daily, weekly, summary
+  date        String   // YYYY-MM-DD or YYYY-Www
+  content     String   // JSON string
+  suggestions String   // improvement suggestions text
+  createdAt   DateTime @default(now())
+
+  session     UploadSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
